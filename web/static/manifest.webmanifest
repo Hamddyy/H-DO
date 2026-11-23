@@ -1,0 +1,9 @@
+{
+  "name": "H-DO Downloader", "short_name": "H-DO", "start_url": "/", "display": "standalone",
+  "background_color": "#0B1F4B", "theme_color": "#0B1F4B",
+  "icons": [
+    {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ],
+  "share_target": {"action": "/", "method": "GET", "params": {"url": "url", "text": "text", "title": "title"}}
+}
