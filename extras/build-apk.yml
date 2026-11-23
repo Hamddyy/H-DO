@@ -1,0 +1,58 @@
+name: Build H-DO APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Only used when this workflow is dropped into a repo that is not rebranded yet.
+      - name: Apply H-DO rebrand patch if needed
+        run: |
+          if ! grep -q 'com.hdo.downloader' app/build.gradle && [ -f H-DO-rebrand.patch ]; then
+            git apply --binary H-DO-rebrand.patch
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Prepare
+        run: |
+          touch local.properties
+          chmod +x gradlew
+
+      - name: Build debug APK (no signing secrets needed)
+        run: ./gradlew assembleGithubDebug --stacktrace
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: H-DO-debug-apk
+          path: app/build/outputs/apk/github/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach APKs to a GitHub Release (tags like v1.0.0)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" app/build/outputs/apk/github/debug/*.apk --title "H-DO $GITHUB_REF_NAME" --generate-notes
