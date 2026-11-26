@@ -128,7 +128,7 @@ fun HdoDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit
 
 /** Media3 player surface with a fullscreen button; shared by the search-preview and the downloads player. */
 @Composable
-fun PlayerBox(player: androidx.media3.exoplayer.ExoPlayer, modifier: Modifier = Modifier) {
+fun PlayerBox(player: androidx.media3.exoplayer.ExoPlayer, modifier: Modifier = Modifier, onClose: (() -> Unit)? = null) {
     var full by remember { mutableStateOf(false) }
     Box(modifier) {
         AndroidView(
@@ -142,6 +142,14 @@ fun PlayerBox(player: androidx.media3.exoplayer.ExoPlayer, modifier: Modifier = 
             update = { it.player = if (full) null else player },
             modifier = Modifier.fillMaxSize(),
         )
+        if (!full && onClose != null) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(34.dp).background(Color(0x88000000), RoundedCornerShape(8.dp)),
+            ) {
+                Icon(Icons.Filled.Close, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
         if (!full) {
             IconButton(
                 onClick = { full = true },

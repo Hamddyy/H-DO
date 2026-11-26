@@ -271,7 +271,7 @@ private fun PlayerDialog(task: Task, onDismiss: () -> Unit) {
         androidx.compose.runtime.DisposableEffect(task.id) {
             onDispose { player.release() }
         }
-        PlayerBox(player, Modifier.fillMaxWidth().height(240.dp).padding(vertical = 8.dp))
+        PlayerBox(player, Modifier.fillMaxWidth().height(240.dp).padding(vertical = 8.dp), onClose = onDismiss)
         Text(listOf(fmtSize(task.size), task.uploader).filter { it.isNotBlank() }.joinToString(" • "), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip(onClick = {

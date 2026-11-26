@@ -307,7 +307,7 @@ private fun PreviewDialog(e: Entry, onDismiss: () -> Unit) {
                     androidx.compose.material3.CircularProgressIndicator()
                     Text(t("loading_preview"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                 }
-                state == "play" -> player?.let { PlayerBox(it, Modifier.fillMaxSize()) }
+                state == "play" -> player?.let { PlayerBox(it, Modifier.fillMaxSize(), onClose = onDismiss) }
                 else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("⚠️", fontSize = 28.sp)
                     val msg = state.removePrefix("error:")

@@ -699,7 +699,10 @@ object Engine {
         } catch (e: Throwable) {
             // NewPipe path failed mid-setup or mid-download: retry this task through yt-dlp (resumes what it can)
             logEvent(ctx, "download", "NewPipe download failed (" + e.javaClass.simpleName + ": " + (e.message ?: "").take(120) + ") -> yt-dlp fallback")
-            downloadYt(ctx, t, dir, onLine)
+            try { downloadYt(ctx, t, dir, onLine) } catch (e2: Throwable) {
+                if (e2 !is RangeDl.Canceled) logEvent(ctx, "download", "yt-dlp also failed: " + (e2.message ?: e2.javaClass.simpleName).replace("\n", " ").take(400))
+                throw e2
+            }
         }
     }
 
@@ -863,20 +866,35 @@ object Engine {
     // ----------------------------------------------------------------- ffmpeg
     /** The ffmpeg AAR extracts its binary under noBackupFilesDir; find it wherever it landed. */
     private fun findFfmpeg(ctx: Context): File? {
+        val nl = File(ctx.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        if (nl.exists()) return nl
         val q = ArrayDeque<File>(); q.add(ctx.noBackupFilesDir)
         while (q.isNotEmpty()) {
             val d = q.removeFirst()
-            d.listFiles()?.forEach { f -> if (f.isDirectory) q.add(f) else if (f.name.contains("ffmpeg")) return f }
+            d.listFiles()?.forEach { f -> if (f.isDirectory) q.add(f) else if (f.name.contains("ffmpeg") && f.canExecute()) return f }
         }
         return null
     }
 
+    private fun ffmpegLibPath(ctx: Context): String {
+        val root = File(ctx.noBackupFilesDir, "youtubedl-android/packages")
+        val dirs = LinkedHashSet<String>()
+        root.walkTopDown().maxDepth(4).filter { it.isDirectory && it.name == "lib" }.forEach { dirs.add(it.absolutePath) }
+        dirs.add(ctx.applicationInfo.nativeLibraryDir)
+        return dirs.joinToString(":")
+    }
+
     fun runFfmpeg(args: List<String>): Pair<Int, String> {
+        val app = appCtx
+        if (ffmpegBin == null && app != null) {
+            try { FFmpeg.getInstance().init(app) } catch (_: Throwable) { }
+            ffmpegBin = findFfmpeg(app)
+        }
         val bin = ffmpegBin ?: return -1 to "ffmpeg binary not found"
         return try {
             bin.setExecutable(true)
             val pb = ProcessBuilder(listOf(bin.absolutePath) + args).redirectErrorStream(true)
-            pb.environment()["LD_LIBRARY_PATH"] = bin.parentFile!!.absolutePath
+            pb.environment()["LD_LIBRARY_PATH"] = if (app != null) ffmpegLibPath(app) else bin.parentFile!!.absolutePath
             val p = pb.start()
             val out = p.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
             p.waitFor() to out

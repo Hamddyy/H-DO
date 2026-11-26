@@ -23,30 +23,18 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Restore and check signing key
+      - name: Restore signing key from secrets
         env:
-          S_B64: ${{ secrets.HDO_KEYSTORE_B64 }}
-          S_STOREPASS: ${{ secrets.HDO_KEYSTORE_PASSWORD }}
-          S_ALIAS: ${{ secrets.HDO_KEY_ALIAS }}
-          S_KEYPASS: ${{ secrets.HDO_KEY_PASSWORD }}
+          HDO_KEYSTORE_B64: ${{ secrets.HDO_KEYSTORE_B64 }}
         run: |
-          # Phone keyboards often add spaces, newlines or capital letters: strip whitespace everywhere.
-          B64=$(printf %s "$S_B64" | tr -d '[:space:]')
-          STOREPASS=$(printf %s "$S_STOREPASS" | tr -d '[:space:]')
-          ALIAS=$(printf %s "$S_ALIAS" | tr -d '[:space:]')
-          KEYPASS=$(printf %s "$S_KEYPASS" | tr -d '[:space:]')
-          echo "secret lengths: b64=${#B64} (expect 3448) storepass=${#STOREPASS} (expect 7) alias=${#ALIAS} (expect 15) keypass=${#KEYPASS} (expect 7)"
-          printf %s "$B64" | base64 -d > "$RUNNER_TEMP/hdo.keystore"
-          echo "keystore md5: $(md5sum "$RUNNER_TEMP/hdo.keystore" | cut -d' ' -f1) (expect 58b4c8b6f472b941ab5081b5d9e88472)"
-          echo "::group::keytool check"
-          keytool -list -keystore "$RUNNER_TEMP/hdo.keystore" -storepass "$STOREPASS" 2>&1 | sed 's/^/  /' | grep -v "^  Your keystore" || true
-          keytool -list -keystore "$RUNNER_TEMP/hdo.keystore" -storepass "$STOREPASS" -alias "$ALIAS" -keypass "$KEYPASS" 2>&1 | sed 's/^/  /' || true
-          echo "::endgroup::"
-          echo "HDO_KEYSTORE_FILE=$RUNNER_TEMP/hdo.keystore" >> "$GITHUB_ENV"
-          echo "HDO_KEYSTORE_PASSWORD=$STOREPASS" >> "$GITHUB_ENV"
-          echo "HDO_KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
-          echo "HDO_KEY_PASSWORD=$KEYPASS" >> "$GITHUB_ENV"
+          test -n "$HDO_KEYSTORE_B64" || { echo "Secret HDO_KEYSTORE_B64 is missing"; exit 1; }
+          echo "$HDO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/hdo.keystore"
       - name: Build signed release
+        env:
+          HDO_KEYSTORE_FILE: ${{ runner.temp }}/hdo.keystore
+          HDO_KEYSTORE_PASSWORD: ${{ secrets.HDO_KEYSTORE_PASSWORD }}
+          HDO_KEY_ALIAS: ${{ secrets.HDO_KEY_ALIAS }}
+          HDO_KEY_PASSWORD: ${{ secrets.HDO_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
       - name: Rename APKs
         run: |
