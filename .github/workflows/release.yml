@@ -1,0 +1,56 @@
+name: Release signed APK
+
+# Run from Actions -> "Release signed APK" -> Run workflow, and type the version (for example 1.5.6).
+# It builds the arm64 and armeabi-v7a APKs, signs them with the key stored in GitHub secrets,
+# and publishes them as a GitHub Release. The app's update check reads that release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag without v (must match versionName in app/build.gradle.kts)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Restore signing key from secrets
+        env:
+          HDO_KEYSTORE_B64: ${{ secrets.HDO_KEYSTORE_B64 }}
+        run: |
+          test -n "$HDO_KEYSTORE_B64" || { echo "Secret HDO_KEYSTORE_B64 is missing"; exit 1; }
+          echo "$HDO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/hdo.keystore"
+      - name: Build signed release
+        env:
+          HDO_KEYSTORE_FILE: ${{ runner.temp }}/hdo.keystore
+          HDO_KEYSTORE_PASSWORD: ${{ secrets.HDO_KEYSTORE_PASSWORD }}
+          HDO_KEY_ALIAS: ${{ secrets.HDO_KEY_ALIAS }}
+          HDO_KEY_PASSWORD: ${{ secrets.HDO_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Rename APKs
+        run: |
+          mkdir out
+          for f in app/build/outputs/apk/release/*.apk; do
+            case "$f" in
+              *arm64*) cp "$f" "out/H-DO-arm64-v${{ inputs.version }}.apk" ;;
+              *armeabi*) cp "$f" "out/H-DO-armeabi-v7a-v${{ inputs.version }}.apk" ;;
+            esac
+          done
+          ls -l out
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ inputs.version }}" out/*.apk --title "H-DO ${{ inputs.version }}" --generate-notes
+      - name: Remove key from runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/hdo.keystore"

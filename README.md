@@ -1,16 +1,20 @@
-<h1 align="center">
-	<img src="fastlane/metadata/android/en-US/images/icon.png" width="25%" /> <br>
-	H-DO
-</h1>
+# H-DO for Android (v1.1)
 
-|
+تطبيق أصلي بـ Kotlin وJetpack Compose، يضم yt-dlp وPython وffmpeg عبر مكتبة youtubedl-android.
 
-<h3 align="center">
-	H-DO is a free and open source video/audio downloader using yt-dlp for Android 7.0 and above.
-</h3>
-<h4 align="center">
-	Created by HAMDY MANSOUR
-</h4>
+## الصفحات
+- **الرئيسية**: بحث بالاسم (يوتيوب / يوتيوب ميوزك / ساوند كلاود) أو لصق رابط، نتائج تحتها زر «تحميل» يفتح الجودات والصيغ المتاحة.
+- **التنزيلات**: الجارية ثم المتوقفة ثم الفاشلة ثم المكتملة، مع فلاتر (الكل/فيديو/صوت/فاشلة/حسب الموقع) وبحث وفرز.
+- **الإعدادات**: المظهر، الرئيسية والبحث، التحميل، الشبكة، الإشعارات، التخزين، الأمان.
+- **حول**: الاسم والإصدار والمؤسس (Hamdy Mansour)، فحص التحديث، تحديث محرك yt-dlp.
 
-<div align="center">
+## ملاحظات تقنية
+- يتطلب أندرويد 10 أو أحدث. يحفظ في `Download/H-DO/` عبر MediaStore، أو في مجلد خاص مخفي عن المعرض إن فعّلت الخيار.
+- المكتبة تُحدَّث في الخلفية عند فتح التطبيق (كل 10 دقائق كحد أدنى) وكل 6 ساعات عبر WorkManager.
+- أقسام الكوكيز والنسخ الاحتياطي مخفية؛ لإظهارها اجعل `SHOW_HIDDEN_SETTINGS = true` في `Config.kt`.
+- فحص التحديث يقرأ آخر إصدار من `Config.UPDATE_REPO` (عدّله إن كان اسم مستودعك مختلفاً)، ويُنشأ الإصدار تلقائياً عند رفع tag مثل `v1.1.0`.
+- بلاطة الإعدادات السريعة «الصق وحمّل»: أضفها من تعديل البلاطات في الهاتف.
 
+## البناء
+- **GitHub Actions**: Actions ← *Build H-DO Android APK* ← Run workflow، ثم حمّل `H-DO-android-debug` من Artifacts.
+- **محلياً**: `./gradlew assembleDebug` (JDK 17).

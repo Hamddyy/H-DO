@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Hdo" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ic_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <!-- system splash (Android 12+): same dark background as the intro animation -->
+        <item name="android:windowSplashScreenBackground">@color/ic_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_logo</item>
+    </style>
+</resources>
