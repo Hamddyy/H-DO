@@ -84,20 +84,6 @@ fun fmtDate(ms: Long): String = DateFormat.getDateTimeInstance(DateFormat.SHORT,
 @Composable
 fun hintText(code: String): String? = if (code.isBlank()) null else Strings.get("h_$code", LocalLang.current).takeIf { it != "h_$code" }
 
-@Composable
-fun Ring(percent: Float, modifier: Modifier = Modifier.size(54.dp)) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(
-            progress = { 1f }, modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceVariant,
-            strokeWidth = 5.dp, trackColor = MaterialTheme.colorScheme.surfaceVariant, strokeCap = StrokeCap.Round,
-        )
-        CircularProgressIndicator(
-            progress = { (percent / 100f).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxSize(),
-            strokeWidth = 5.dp, trackColor = MaterialTheme.colorScheme.surfaceVariant, strokeCap = StrokeCap.Round,
-        )
-        Text("${percent.toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-    }
-}
 
 @Composable
 fun EmptyState(emoji: String, title: String, sub: String) {
@@ -297,29 +283,3 @@ fun ActionButton(
     }
 }
 
-/** The animated intro (res/raw/splash.gif) shown briefly when the app opens. */
-@Composable
-fun SplashScreen() {
-    Box(Modifier.fillMaxSize().background(Color(0xFF01000D))) {
-        AndroidView(
-            factory = { c ->
-                android.widget.ImageView(c).apply {
-                    scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                    try {
-                        val d = android.graphics.ImageDecoder.decodeDrawable(
-                            android.graphics.ImageDecoder.createSource(c.resources, R.raw.splash))
-                        setImageDrawable(d)
-                        if (d is android.graphics.drawable.AnimatedImageDrawable) {
-                            d.repeatCount = android.graphics.drawable.AnimatedImageDrawable.REPEAT_INFINITE
-                            d.start()
-                        }
-                    } catch (e: Exception) {
-                        scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-                        setImageResource(R.drawable.ic_logo)
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
-}

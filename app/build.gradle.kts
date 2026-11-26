@@ -5,6 +5,7 @@ plugins {
 }
 
 android {
+    testOptions { unitTests.isReturnDefaultValues = true }
     namespace = "com.hdo.app"
     compileSdk = 35
 
@@ -12,8 +13,8 @@ android {
         applicationId = "com.hdo.app"
         minSdk = 29            // MediaStore-based saving needs no storage permission from Android 10
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.5.8"
+        versionCode = 26
+        versionName = "1.6.3"
     }
 
     // Release signing comes from environment variables (GitHub Actions secrets). Without them the
@@ -71,6 +72,7 @@ android {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
     val bom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(bom)
@@ -81,7 +83,6 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // yt-dlp fallback engine (lazy-loaded) for sites NewPipe does not cover (Facebook etc.)

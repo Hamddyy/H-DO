@@ -129,7 +129,7 @@ object RangeDl {
     }
 
     private fun saveState(f: File, arr: LongArray) {
-        try { f.writeText(JSONArray(arr.toList()).toString()) } catch (_: Exception) { }
+        try { f.writeText(JSONArray(arr.toList()).toString()) } catch (e: Exception) { Engine.logEvent(null, "RangeDl:132", e.toString()) }
     }
 
     private fun fetchRange(id: String, url: String, raf: RandomAccessFile, off: Long, end: Long, rateBps: Long, onBytes: (Int) -> Unit) {

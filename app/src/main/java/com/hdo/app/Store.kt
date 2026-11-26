@@ -75,6 +75,8 @@ object Store {
     private fun saveHistory() { sp?.edit()?.putString("history", JSONArray(history.value).toString())?.apply() }
 
     // ---- misc persisted longs
+    fun getString(key: String): String? = sp?.getString(key, null)
+    fun putString(key: String, v: String) { sp?.edit()?.putString(key, v)?.apply() }
     fun getLong(key: String): Long = sp?.getLong(key, 0L) ?: 0L
     fun putLong(key: String, v: Long) { sp?.edit()?.putLong(key, v)?.apply() }
     fun markSynced(now: Long) { lastSync.value = now; putLong("lastSync", now) }

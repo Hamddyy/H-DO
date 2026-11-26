@@ -43,6 +43,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -89,11 +90,79 @@ class MainVm(app: Application) : AndroidViewModel(app) {
     var clip by mutableStateOf<String?>(null)
     var requestTab by mutableStateOf<Int?>(null)
     var locked by mutableStateOf(false)
-    var skipSplash by mutableStateOf(false)
     private var lastClip = ""
     private var searchJob: Job? = null
     private var suggestJob: Job? = null
     private var prefetchJob: Job? = null
+    var update by mutableStateOf<Engine.Release?>(null)       // newer GitHub release, shown as a banner on Home
+    var updateDismissed by mutableStateOf(false)              // per app session
+    var updState by mutableStateOf("idle")                    // idle | downloading | ready | error
+    var updProgress by mutableFloatStateOf(0f)
+    private var updFile: java.io.File? = null
+
+    fun startUpdate(ctx: Context) {
+        val f = updFile
+        if (updState == "ready" && f != null && f.exists()) { installUpdate(ctx, f); return }
+        val r = update ?: return
+        if (updState == "downloading") return
+        if (r.apkUrl.isBlank()) { openUrl(ctx, r.pageUrl); return }
+        updState = "downloading"; updProgress = 0f
+        viewModelScope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) { Updater.download(ctx.applicationContext, r.apkUrl) { p -> updProgress = p } }
+                updFile = file; updState = "ready"
+                installUpdate(ctx, file)
+            } catch (e: CancellationException) { throw e } catch (e: Throwable) {
+                Engine.logEvent(null, "update-download", e.toString()); updState = "error"
+            }
+        }
+    }
+
+    private fun installUpdate(ctx: Context, f: java.io.File) {
+        val ok = try { Updater.install(ctx, f) } catch (e: Exception) { Engine.logEvent(null, "update-install", e.toString()); false }
+        if (!ok) toast(ctx, Strings.get("upd_allow", Store.settings.value.lang))
+    }
+
+    private fun openUrl(ctx: Context, url: String) {
+        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    init {
+        restoreSearch()
+        // once per app open: look for a newer release (silent on failure)
+        viewModelScope.launch {
+            try {
+                val r = withContext(Dispatchers.IO) { Engine.latestRelease() }
+                if (r != null && Engine.isNewer(r.tag, BuildConfig.VERSION_NAME)) update = r
+            } catch (e: CancellationException) { throw e } catch (e: Throwable) { Engine.logEvent(null, "update-check", e.toString()) }
+        }
+    }
+
+    /** The last search (query + results) survives closing the app; it is replaced only by a new search. */
+    private fun saveSearch() {
+        val a = org.json.JSONArray()
+        results.take(60).forEach { e ->
+            a.put(org.json.JSONObject().put("id", e.id).put("title", e.title).put("url", e.url).put("duration", e.duration)
+                .put("thumb", e.thumb).put("uploader", e.uploader).put("views", e.views))
+        }
+        Store.putString("lastSearch", org.json.JSONObject().put("q", query).put("src", source).put("count", count)
+            .put("canMore", canMore).put("results", a).toString())
+    }
+
+    private fun restoreSearch() {
+        try {
+            val o = org.json.JSONObject(Store.getString("lastSearch") ?: return)
+            val a = o.optJSONArray("results") ?: return
+            val list = (0 until a.length()).map { i ->
+                val e = a.getJSONObject(i)
+                Entry(e.optString("id"), e.optString("title"), e.optString("url"), e.optLong("duration"),
+                    e.optString("thumb"), e.optString("uploader"), e.optLong("views"))
+            }
+            if (list.isEmpty()) return
+            query = o.optString("q"); source = o.optString("src", source); count = o.optInt("count", count)
+            canMore = o.optBoolean("canMore"); results = list
+        } catch (e: Exception) { Engine.logEvent(null, "restoreSearch", e.toString()) }
+    }
 
     fun onQuery(text: String) {
         query = text
@@ -109,6 +178,7 @@ class MainVm(app: Application) : AndroidViewModel(app) {
     fun clear() {
         searchJob?.cancel(); suggestJob?.cancel(); prefetchJob?.cancel()
         query = ""; results = emptyList(); playlist = null; suggestions = emptyList(); error = ""; searching = false; canMore = false
+        Store.putString("lastSearch", "")
     }
 
     fun search(more: Boolean = false) {
@@ -134,6 +204,7 @@ class MainVm(app: Application) : AndroidViewModel(app) {
                     canMore = list.size >= count && count < 50
                     if (list.isEmpty()) error = "none"
                 }
+                if (results.isNotEmpty()) saveSearch()
                 // warm the preview cache for the top results so tapping a thumbnail is usually instant
                 val top = results.take(2)
                 prefetchJob = viewModelScope.launch {
@@ -142,7 +213,7 @@ class MainVm(app: Application) : AndroidViewModel(app) {
                             withContext(Dispatchers.IO) { Engine.fastStream(e.id.ifBlank { e.url }, e.url, 480) }
                         } catch (ce: CancellationException) {
                             throw ce
-                        } catch (_: Exception) { }
+                        } catch (e: Exception) { Engine.logEvent(null, "MainActivity:144", e.toString()) }
                     }
                 }
             } catch (e: CancellationException) {
@@ -170,7 +241,7 @@ class MainVm(app: Application) : AndroidViewModel(app) {
     }
 
     fun checkClip(ctx: Context) {
-        if (query.isNotEmpty()) return
+        if (query.isNotEmpty() && focused) return
         val u = Engine.extractUrls(clipText(ctx) ?: return).firstOrNull() ?: return
         if (u != lastClip) { lastClip = u; clip = u }
     }
@@ -245,11 +316,10 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(i: Intent?) {
         if (i == null) return
-        if (i.action == ACTION_PASTE_GO) { pasteGoPending = true; vm.skipSplash = true; return }
+        if (i.action == ACTION_PASTE_GO) { pasteGoPending = true; return }
         if (i.action == Intent.ACTION_SEND && i.type?.startsWith("text/") == true) {
             val txt = i.getStringExtra(Intent.EXTRA_TEXT) ?: return
             vm.query = Engine.extractUrls(txt).firstOrNull() ?: txt
-            vm.skipSplash = true
             vm.requestTab = 0
             vm.search()
         }

@@ -422,7 +422,7 @@ object Engine {
                 val now = System.currentTimeMillis()
                 if (Store.settings.value.autoUpdateEngine && online(app) && now - Store.getLong("engineUpdated") > 24 * 3_600_000L) {
                     Thread {
-                        try { YoutubeDL.getInstance().updateYoutubeDL(app, YoutubeDL.UpdateChannel.STABLE); Store.putLong("engineUpdated", now) } catch (_: Exception) { }
+                        try { YoutubeDL.getInstance().updateYoutubeDL(app, YoutubeDL.UpdateChannel.STABLE); Store.putLong("engineUpdated", now) } catch (e: Exception) { Engine.logEvent(null, "Engine:425", e.toString()) }
                     }.start()
                 }
             } catch (e: Throwable) {
@@ -775,24 +775,41 @@ object Engine {
     /** Mux video + audio with the bundled ffmpeg (stream copy: seconds even on slow phones). */
     private fun merge(np: NpVideo, t: Task, vF: File, aF: File, out: File, dir: File, onLine: (Float, Long, String) -> Unit) {
         onLine(0f, 0, "[Merger] Merging formats into \"${out.absolutePath}\"")
-        val cover = if (t.embed && np.thumb.isNotBlank() && out.extension == "mp4") fetchThumb(np.thumb, dir) else null
-        val args = ArrayList<String>()
-        args += listOf("-y", "-i", vF.absolutePath, "-i", aF.absolutePath)
-        if (cover != null) args += listOf("-i", cover.absolutePath, "-map", "0:v", "-map", "0:a", "-map", "1:v", "-disposition:v:1", "attached_pic")
-        else args += listOf("-map", "0:v", "-map", "0:a")
-        args += listOf("-c", "copy")
-        if (out.extension == "mp4") args += listOf("-movflags", "+faststart")
-        if (t.embed) {
-            args += listOf("-metadata", "title=${np.title}", "-metadata", "artist=${np.uploader}")
-            if (np.uploadDate.isNotBlank()) args += listOf("-metadata", "date=${np.uploadDate}")
+        val ext = out.extension.ifBlank { "mp4" }
+        // always merge into a plain ASCII temp name, then rename: titles with Arabic/spaces/odd chars never reach ffmpeg's output path
+        val tmp = File(dir, "merge.tmp.$ext")
+        val muxer = when (ext) { "mkv" -> "matroska"; "webm" -> "webm"; else -> "mp4" }
+        val cover = if (t.embed && np.thumb.isNotBlank() && ext == "mp4") fetchThumb(np.thumb, dir) else null
+        fun attempt(withCover: Boolean, withMeta: Boolean, faststart: Boolean): Pair<Int, String> {
+            tmp.delete()
+            val a = ArrayList<String>()
+            a += listOf("-y", "-i", vF.absolutePath, "-i", aF.absolutePath)
+            if (withCover && cover != null) a += listOf("-i", cover.absolutePath, "-map", "0:v", "-map", "0:a", "-map", "2:v", "-disposition:v:1", "attached_pic")
+            else a += listOf("-map", "0:v", "-map", "0:a")
+            a += listOf("-c", "copy")
+            if (faststart && ext == "mp4") a += listOf("-movflags", "+faststart")
+            if (withMeta && t.embed) {
+                a += listOf("-metadata", "title=${np.title.replace('\n', ' ')}", "-metadata", "artist=${np.uploader.replace('\n', ' ')}")
+                if (np.uploadDate.isNotBlank()) a += listOf("-metadata", "date=${np.uploadDate}")
+            }
+            a += listOf("-f", muxer, tmp.absolutePath)
+            return runFfmpeg(a)
         }
-        args += out.absolutePath
-        val (code, log) = runFfmpeg(args)
-        cover?.delete()
-        if (code != 0 || !out.isFile || out.length() == 0L) {
-            if (cover != null) return merge(np, t, vF, aF, out, dir, onLine)   // retry without the cover
-            throw IllegalStateException("ffmpeg merge failed ($code): ${log.takeLast(160)}")
+        // most complete first, then simpler variants; the full ffmpeg tail goes to the diagnostics log
+        val steps = listOf(Triple(true, true, true), Triple(false, true, true), Triple(false, false, true), Triple(false, false, false))
+        var lastCode = -1; var lastLog = ""
+        for ((c, m, f) in steps) {
+            if (c && cover == null) continue
+            val (code, log) = attempt(c, m, f)
+            lastCode = code; lastLog = log
+            if (code == 0 && tmp.isFile && tmp.length() > 0L) {
+                out.delete()
+                if (tmp.renameTo(out)) { cover?.delete(); return }
+            }
+            logEvent(null, "merge", "attempt cover=$c meta=$m faststart=$f failed ($code): " + log.takeLast(300).replace("\n", " "))
         }
+        cover?.delete(); tmp.delete()
+        throw IllegalStateException("ffmpeg merge failed ($lastCode): ${lastLog.takeLast(200)}")
     }
 
     /** Convert the raw audio stream to the requested format; plain rename when no conversion is needed. */
@@ -853,7 +870,7 @@ object Engine {
                     val txt = c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     if (txt.isNotBlank()) File(dir, "$base.${sub.lang}.${sub.ext}").writeText(txt)
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) { Engine.logEvent(null, "Engine:856", e.toString()) }
         }
     }
 
@@ -887,7 +904,7 @@ object Engine {
     fun runFfmpeg(args: List<String>): Pair<Int, String> {
         val app = appCtx
         if (ffmpegBin == null && app != null) {
-            try { FFmpeg.getInstance().init(app) } catch (_: Throwable) { }
+            try { FFmpeg.getInstance().init(app) } catch (e: Throwable) { Engine.logEvent(null, "Engine:890", e.toString()) }
             ffmpegBin = findFfmpeg(app)
         }
         val bin = ffmpegBin ?: return -1 to "ffmpeg binary not found"
@@ -965,8 +982,13 @@ object Engine {
 
     /** Latest GitHub release of Config.UPDATE_REPO, or null when none is published. */
     fun latestRelease(): Release? {
+        try { return latestFromApi() } catch (e: Exception) { logEvent(null, "update-check", "api failed: " + e.javaClass.simpleName) }
+        return latestFromRedirect()   // no API: the /releases/latest page redirects to the tag
+    }
+
+    private fun latestFromApi(): Release? {
         val c = (URL("https://api.github.com/repos/${Config.UPDATE_REPO}/releases/latest").openConnection() as HttpURLConnection).apply {
-            connectTimeout = 8000; readTimeout = 8000; setRequestProperty("Accept", "application/vnd.github+json")
+            connectTimeout = 12000; readTimeout = 15000; setRequestProperty("Accept", "application/vnd.github+json")
         }
         if (c.responseCode == 404) return null
         val o = JSONObject(c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
@@ -978,6 +1000,16 @@ object Engine {
             }
         }
         return Release(o.str("tag_name"), o.str("html_url"), apk)
+    }
+
+    private fun latestFromRedirect(): Release? {
+        val c = (URL("https://github.com/${Config.UPDATE_REPO}/releases/latest").openConnection() as HttpURLConnection).apply {
+            connectTimeout = 12000; readTimeout = 15000; instanceFollowRedirects = false
+        }
+        val loc = c.getHeaderField("Location") ?: return null
+        val tag = loc.substringAfterLast("/tag/", "").ifBlank { return null }
+        // asset name follows the release workflow: H-DO-arm64-<tag>.apk
+        return Release(tag, loc, "https://github.com/${Config.UPDATE_REPO}/releases/download/$tag/H-DO-arm64-$tag.apk")
     }
 
     fun isNewer(tag: String, current: String): Boolean {

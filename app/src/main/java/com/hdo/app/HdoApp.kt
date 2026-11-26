@@ -24,7 +24,7 @@ class HdoApp : Application() {
                     SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US).format(Date()) + " thread=" + t.name + "\n" +
                         e.javaClass.name + ": " + (e.message ?: "") + "\n" +
                         e.stackTrace.take(30).joinToString("\n") { it.toString() } + "\n")
-            } catch (_: Throwable) { }
+            } catch (e: Throwable) { Engine.logEvent(null, "HdoApp:27", e.toString()) }
             prevHandler?.uncaughtException(t, e)
         }
         Store.init(this)

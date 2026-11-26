@@ -53,7 +53,7 @@ object Notif {
 
     @SuppressLint("MissingPermission")
     fun post(ctx: Context, id: Int, n: Notification) {
-        try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (_: Exception) { }
+        try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (e: Exception) { Engine.logEvent(null, "DownloadService:56", e.toString()) }
     }
 
     /** Opens the finished file when tapped. */
@@ -108,7 +108,7 @@ class DownloadService : Service() {
             }
             cm.registerDefaultNetworkCallback(cb)
             netCb = cb
-        } catch (_: Exception) { }
+        } catch (e: Exception) { Engine.logEvent(null, "DownloadService:111", e.toString()) }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -118,7 +118,7 @@ class DownloadService : Service() {
     }
 
     override fun onDestroy() {
-        try { netCb?.let { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) } } catch (_: Exception) { }
+        try { netCb?.let { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it) } } catch (e: Exception) { Engine.logEvent(null, "DownloadService:121", e.toString()) }
         scope.coroutineContext[Job]?.cancel()
         super.onDestroy()
     }

@@ -138,8 +138,8 @@ data class Settings(
     val quickMode: Boolean = false,             // tap = start with defaults, long-press = options
     val saveHistory: Boolean = true,
     // downloads
-    val defQuality: String = "480",
-    val previewQuality: String = "auto",         // auto | 240..1080: starting quality of the video preview
+    val defQuality: String = "360",
+    val previewQuality: String = "360",          // auto | 240..1080: starting quality of the video preview
     val defContainer: String = "mp4",
     val defAudioFormat: String = "mp3",
     val defAudioQuality: String = "192",
@@ -164,7 +164,7 @@ data class Settings(
     val notifyDone: Boolean = true,
     val notifySound: Boolean = true,
     // storage & security
-    val autoDeleteDays: Int = 0,
+    val saveTreeUri: String = "",             // chosen download folder (SAF tree uri); empty = Downloads/H-DO
     val privateFolder: Boolean = false,
     val appLock: Boolean = false,
     val showIntro: Boolean = true,
@@ -172,15 +172,15 @@ data class Settings(
     fun toJson(): JSONObject = JSONObject()
         .put("lang", lang).put("theme", theme).put("accent", accent).put("fontScale", fontScale.toDouble())
         .put("searchSource", searchSource).put("searchCount", searchCount).put("quickMode", quickMode).put("saveHistory", saveHistory)
-        .put("defQuality", defQuality).put("defContainer", defContainer).put("defAudioFormat", defAudioFormat)
+        .put("defQuality", defQuality).put("previewQuality", previewQuality).put("saveTreeUri", saveTreeUri).put("defContainer", defContainer).put("defAudioFormat", defAudioFormat)
         .put("defAudioQuality", defAudioQuality).put("folderMode", folderMode).put("nameTemplate", nameTemplate)
         .put("embed", embed).put("subtitles", subtitles).put("subLangs", subLangs).put("sponsor", sponsor)
         .put("sponsorCats", sponsorCats).put("autoUpdateEngine", autoUpdateEngine)
         .put("maxConcurrent", maxConcurrent).put("rateLimit", rateLimit).put("wifiOnly", wifiOnly).put("proxy", proxy)
         .put("dataSaver", dataSaver).put("fragConcurrency", fragConcurrency)
         .put("autoRetry", autoRetry).put("retries", retries).put("notifyDone", notifyDone).put("notifySound", notifySound)
-        .put("autoDeleteDays", autoDeleteDays).put("privateFolder", privateFolder).put("appLock", appLock).put("showIntro", showIntro)
-        .put("migV", 1)
+        .put("privateFolder", privateFolder).put("appLock", appLock).put("showIntro", showIntro)
+        .put("migV", 2)
 
     companion object {
         fun fromJson(o: JSONObject): Settings {
@@ -190,7 +190,9 @@ data class Settings(
                 accent = o.optInt("accent", d.accent), fontScale = o.optDouble("fontScale", d.fontScale.toDouble()).toFloat(),
                 searchSource = o.str("searchSource").ifBlank { d.searchSource }, searchCount = o.optInt("searchCount", d.searchCount),
                 quickMode = o.optBoolean("quickMode", d.quickMode), saveHistory = o.optBoolean("saveHistory", d.saveHistory),
-                defQuality = if (o.optInt("migV", 0) >= 1) o.str("defQuality").ifBlank { d.defQuality } else "480",
+                defQuality = if (o.optInt("migV", 0) >= 2) o.str("defQuality").ifBlank { d.defQuality } else "360",   // v2: one-time reset to 360p
+                previewQuality = if (o.optInt("migV", 0) >= 2) o.str("previewQuality").ifBlank { d.previewQuality } else "360",
+                saveTreeUri = o.str("saveTreeUri"),
                 defContainer = o.str("defContainer").ifBlank { d.defContainer },
                 defAudioFormat = o.str("defAudioFormat").ifBlank { d.defAudioFormat },
                 defAudioQuality = o.str("defAudioQuality").ifBlank { d.defAudioQuality },
@@ -205,7 +207,7 @@ data class Settings(
                 dataSaver = o.optBoolean("dataSaver", d.dataSaver),
                 autoRetry = o.optBoolean("autoRetry", d.autoRetry), retries = o.optInt("retries", d.retries).coerceIn(0, 10),
                 notifyDone = o.optBoolean("notifyDone", d.notifyDone), notifySound = o.optBoolean("notifySound", d.notifySound),
-                autoDeleteDays = o.optInt("autoDeleteDays", d.autoDeleteDays), privateFolder = o.optBoolean("privateFolder", d.privateFolder),
+                privateFolder = o.optBoolean("privateFolder", d.privateFolder),
                 appLock = o.optBoolean("appLock", d.appLock), showIntro = o.optBoolean("showIntro", d.showIntro),
             )
         }

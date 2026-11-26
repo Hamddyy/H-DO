@@ -20,12 +20,10 @@ object LibrarySync {
         try {
             withContext(Dispatchers.IO) {
                 val now = System.currentTimeMillis()
-                val days = Store.settings.value.autoDeleteDays
                 val done = Store.tasks.value.filter { it.status == St.DONE && it.uri.isNotBlank() }
                 val gone = HashSet<String>()
                 for (t in done) {
                     if (!Storage.exists(ctx, t)) { gone.add(t.id); continue }
-                    if (days > 0 && t.finished > 0 && now - t.finished > days * 86_400_000L) { Storage.delete(ctx, t); gone.add(t.id) }
                 }
                 val known = done.filter { it.id !in gone }.map { it.uri }.toSet()
                 val found = Storage.scanUntracked(ctx, known)

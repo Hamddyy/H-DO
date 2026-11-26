@@ -3,6 +3,9 @@ package com.hdo.app
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.background
+import androidx.compose.material3.Button
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -94,6 +97,50 @@ fun HomeScreen(vm: MainVm) {
         Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
+        vm.update?.let { r ->
+            if (!vm.updateDismissed) item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(start = 14.dp, top = 12.dp, end = 6.dp, bottom = 12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Filled.Download, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
+                            }
+                            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                Text(t("new_version") + " " + r.tag, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text(
+                                    when (vm.updState) {
+                                        "downloading" -> t("upd_dl") + " " + (vm.updProgress * 100).toInt() + "%"
+                                        "error" -> t("upd_fail")
+                                        else -> t("upd_cur") + " " + BuildConfig.VERSION_NAME
+                                    },
+                                    fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                                )
+                            }
+                            if (vm.updState != "downloading") {
+                                Button(onClick = { vm.startUpdate(ctx) }, shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 14.dp)) {
+                                    Text(if (vm.updState == "ready") t("upd_install") else t("upd_get"), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            IconButton(onClick = { vm.updateDismissed = true }, modifier = Modifier.size(36.dp)) {
+                                Icon(androidx.compose.material.icons.Icons.Filled.Close, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                        }
+                        if (vm.updState == "downloading") {
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { vm.updProgress },
+                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp, end = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            )
+                        }
+                    }
+                }
+            }
+        }
         vm.clip?.let { c ->
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer), shape = RoundedCornerShape(16.dp)) {
@@ -412,7 +459,7 @@ fun DownloadOptionsDialog(entries: List<Entry>, folder: String, onDismiss: () ->
                 Engine.awaitReady(ctx)
                 info = withContext(Dispatchers.IO) { Engine.probe(ctx, first.url, playlist = false, limit = 1, flat = false) }
                 // probe() already cached the resolved streams: tapping the thumbnail after this is instant
-            } catch (_: Exception) { }
+            } catch (e: Exception) { Engine.logEvent(null, "HomeScreen:415", e.toString()) }
             loading = false
         }
     }
