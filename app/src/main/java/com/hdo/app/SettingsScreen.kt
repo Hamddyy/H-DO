@@ -163,6 +163,7 @@ fun SettingsScreen() {
         }
 
         Group(t("g_downloads")) {
+            Chips(t("prev_quality"), listOf("auto" to t("auto_q"), "240" to "240p", "360" to "360p", "480" to "480p", "720" to "720p", "1080" to "1080p"), s.previewQuality) { v -> Store.setSettings { it.copy(previewQuality = v) } }
             Chips(t("def_quality"), listOf("best" to t("best_quality"), "1080" to "1080p", "720" to "720p", "480" to "480p", "360" to "360p"), s.defQuality) { v -> Store.setSettings { it.copy(defQuality = v) } }
             Chips(t("container"), listOf("mp4" to "mp4", "mkv" to "mkv", "webm" to "webm"), s.defContainer) { v -> Store.setSettings { it.copy(defContainer = v) } }
             Chips(t("afmt"), listOf("mp3" to "mp3", "m4a" to "m4a", "opus" to "opus", "flac" to "flac", "wav" to "wav"), s.defAudioFormat) { v -> Store.setSettings { it.copy(defAudioFormat = v) } }

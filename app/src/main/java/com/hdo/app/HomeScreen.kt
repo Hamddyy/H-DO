@@ -101,6 +101,9 @@ fun HomeScreen(vm: MainVm) {
                         Text("📋 " + t("clip_found"), fontSize = 12.sp)
                         Text(c, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 8.dp), fontSize = 12.sp)
                         TextButton(onClick = { vm.useClip() }) { Text(t("clip_use")) }
+                        IconButton(onClick = { vm.clip = null }, modifier = Modifier.size(32.dp)) {
+                            Icon(androidx.compose.material.icons.Icons.Filled.Close, null, modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
             }
@@ -220,7 +223,7 @@ private fun PreviewDialog(e: Entry, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     var state by remember(e.url) { mutableStateOf("loading") }        // loading | play | error:<msg-or-code>
     var player by remember { mutableStateOf<androidx.media3.exoplayer.ExoPlayer?>(null) }
-    var pQuality by remember { mutableIntStateOf(if (Store.settings.value.dataSaver && !Engine.unmetered(ctx)) 360 else 480) }
+    var pQuality by remember { mutableIntStateOf(Store.settings.value.previewQuality.toIntOrNull() ?: if (Store.settings.value.dataSaver && !Engine.unmetered(ctx)) 360 else 480) }
     var sbSkip by remember { mutableStateOf(false) }
     var curSet by remember { mutableStateOf<Engine.StreamSet?>(null) }
     var forceSlow by remember(e.url) { mutableStateOf(false) }   // set when the direct stream fails: re-resolve fresh URLs

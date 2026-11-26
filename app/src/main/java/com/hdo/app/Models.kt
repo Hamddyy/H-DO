@@ -139,6 +139,7 @@ data class Settings(
     val saveHistory: Boolean = true,
     // downloads
     val defQuality: String = "480",
+    val previewQuality: String = "auto",         // auto | 240..1080: starting quality of the video preview
     val defContainer: String = "mp4",
     val defAudioFormat: String = "mp3",
     val defAudioQuality: String = "192",
