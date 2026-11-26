@@ -131,6 +131,11 @@ fun HomeScreen(vm: MainVm) {
                                 Icon(androidx.compose.material.icons.Icons.Filled.Close, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                             }
                         }
+                        if (vm.updState != "downloading") {
+                            androidx.compose.material3.TextButton(onClick = { vm.skipUpdate(ctx) }, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                                Text(t("upd_skip"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                            }
+                        }
                         if (vm.updState == "downloading") {
                             androidx.compose.material3.LinearProgressIndicator(
                                 progress = { vm.updProgress },

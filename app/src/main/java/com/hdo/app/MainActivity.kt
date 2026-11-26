@@ -98,18 +98,18 @@ class MainVm(app: Application) : AndroidViewModel(app) {
     var updateDismissed by mutableStateOf(false)              // per app session
     var updState by mutableStateOf("idle")                    // idle | downloading | ready | error
     var updProgress by mutableFloatStateOf(0f)
-    private var updFile: java.io.File? = null
+    private var updFile: android.net.Uri? = null
 
     fun startUpdate(ctx: Context) {
         val f = updFile
-        if (updState == "ready" && f != null && f.exists()) { installUpdate(ctx, f); return }
+        if (updState == "ready" && f != null) { installUpdate(ctx, f); return }
         val r = update ?: return
         if (updState == "downloading") return
         if (r.apkUrl.isBlank()) { openUrl(ctx, r.pageUrl); return }
         updState = "downloading"; updProgress = 0f
         viewModelScope.launch {
             try {
-                val file = withContext(Dispatchers.IO) { Updater.download(ctx.applicationContext, r.apkUrl) { p -> updProgress = p } }
+                val file = withContext(Dispatchers.IO) { Updater.download(ctx.applicationContext, r.tag, r.apkUrl) { p -> updProgress = p } }
                 updFile = file; updState = "ready"
                 installUpdate(ctx, file)
             } catch (e: CancellationException) { throw e } catch (e: Throwable) {
@@ -118,7 +118,12 @@ class MainVm(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun installUpdate(ctx: Context, f: java.io.File) {
+    fun skipUpdate(ctx: Context) {
+        update?.let { Updater.skip(ctx.applicationContext, it.tag) }
+        update = null; updState = "idle"; updFile = null
+    }
+
+    private fun installUpdate(ctx: Context, f: android.net.Uri) {
         val ok = try { Updater.install(ctx, f) } catch (e: Exception) { Engine.logEvent(null, "update-install", e.toString()); false }
         if (!ok) toast(ctx, Strings.get("upd_allow", Store.settings.value.lang))
     }
@@ -133,7 +138,16 @@ class MainVm(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val r = withContext(Dispatchers.IO) { Engine.latestRelease() }
-                if (r != null && Engine.isNewer(r.tag, BuildConfig.VERSION_NAME)) update = r
+                val app = getApplication<Application>()
+                if (r != null && Engine.isNewer(r.tag, BuildConfig.VERSION_NAME)) {
+                    if (Updater.skippedTag(app) == r.tag) { Updater.cleanup(app, null) }
+                    else {
+                        update = r
+                        // an earlier download survives app restarts (e.g. after granting "install unknown apps")
+                        Updater.cached(app, r.tag)?.let { updFile = it; updState = "ready" }
+                        Updater.cleanup(app, r.tag)
+                    }
+                } else if (r != null) Updater.cleanup(app, null)   // already on this version or newer: remove old update files
             } catch (e: CancellationException) { throw e } catch (e: Throwable) { Engine.logEvent(null, "update-check", e.toString()) }
         }
     }

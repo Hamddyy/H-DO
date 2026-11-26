@@ -13,8 +13,8 @@ android {
         applicationId = "com.hdo.app"
         minSdk = 29            // MediaStore-based saving needs no storage permission from Android 10
         targetSdk = 35
-        versionCode = 26
-        versionName = "1.6.3"
+        versionCode = 27
+        versionName = "1.6.4"
     }
 
     // Release signing comes from environment variables (GitHub Actions secrets). Without them the
